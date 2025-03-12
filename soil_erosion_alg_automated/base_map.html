@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soil Erosion Risk Factor Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <style>
+        #map { width: 100%; height: 600px; }
+        button { margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Interactive Map</h1>
+
+    <!-- File inputs for raster and shapefile -->
+    <input type="file" id="rasterInput" name="file" accept=".tif,.tiff" style="display:none;">
+    <input type="file" id="shapefileInput" name="file" accept=".shp,.zip,.shx,.dbf" multiple style="display:none;">
+
+    <!-- Buttons to trigger file uploads -->
+    <button onclick="document.getElementById('rasterInput').click()">Upload Raster</button>
+    <button onclick="document.getElementById('shapefileInput').click()">Upload Shapefile (.shp + .shx + .dbf or .zip)</button>
+
+    <!-- Map container with Folium output -->
+    <div id="map">{{ map_data | safe }}</div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var mapDiv = document.querySelector('div[id^="map_"]');
+            var mapId = mapDiv ? mapDiv.id : 'map';
+            var map;
+            setTimeout(function() {
+                for (var key in window) {
+                    if (key === 'map_' + mapId && window[key] instanceof L.Map) {
+                        map = window[key];
+                        console.log('Found map instance:', key);
+                        break;
+                    }
+                }
+                if (!map) {
+                    console.error("Map instance not found. Falling back to manual initialization.");
+                    map = L.map(mapId);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors'
+                    }).addTo(map);
+                }
+
+                var uploadedLayers = {};
+
+                // Handle raster upload
+                document.getElementById('rasterInput').addEventListener('change', function() {
+                    var file = this.files[0];
+                    if (file) {
+                        var formData = new FormData();
+                        formData.append('file', file);
+                        console.log('Uploading raster:', file.name);
+                        fetch('/upload_raster', {
+                            method: 'POST',
+                            body: formData
+                        }).then(response => response.json())
+                          .then(data => {
+                              console.log('Server response:', data);
+                              if (data.status === 'success') {
+                                  var layer = L.imageOverlay('data:image/png;base64,' + data.image_data, data.bounds, {
+                                      opacity: 0.6,
+                                      interactive: true
+                                  }).addTo(map);
+                                  uploadedLayers[data.name] = layer;
+                                  map.fitBounds(data.bounds);
+                                  console.log('Raster added to map');
+                              } else {
+                                  alert('Error: ' + data.message);
+                              }
+                          }).catch(error => {
+                              console.error('Error uploading raster:', error);
+                          });
+                    }
+                });
+
+                // Handle shapefile upload
+                document.getElementById('shapefileInput').addEventListener('change', function() {
+                    var files = this.files;
+                    if (files.length > 0) {
+                        var formData = new FormData();
+                        for (var i = 0; i < files.length; i++) {
+                            formData.append('file', files[i]);
+                        }
+                        console.log('Uploading shapefile(s):', Array.from(files).map(f => f.name));
+                        fetch('/upload_shapefile', {
+                            method: 'POST',
+                            body: formData
+                        }).then(response => response.json())
+                          .then(data => {
+                              console.log('Server response:', data);
+                              if (data.status === 'success') {
+                                  var layer = L.geoJSON(data.geojson).addTo(map);
+                                  uploadedLayers[files[0].name] = layer;
+                                  map.fitBounds(data.bounds);
+                                  console.log('Shapefile added to map');
+                              } else {
+                                  alert('Error: ' + data.message);
+                              }
+                          }).catch(error => {
+                              console.error('Error uploading shapefile:', error);
+                          });
+                    }
+                });
+            }, 1000); // Delay to ensure Folium's script runs
+        });
+    </script>
+</body>
+</html>
