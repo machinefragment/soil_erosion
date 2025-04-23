@@ -59,7 +59,7 @@ def fetch_SENTINEL(bbox, datetime):
         "SENTINEL2_L2A",
         spatial_extent=bbox,
         temporal_extent=datetime,
-        bands=["B02", "B04", "B08", "SCL"],
+        bands=["B03", "B04", "B8A"],
         max_cloud_cover=85
     )
     
@@ -67,35 +67,62 @@ def fetch_SENTINEL(bbox, datetime):
 
 
 # Example usage:
-bounding = {"west": 5.14, "south": 51.17, "east": 5.17, "north": 51.19}
-dates = ["2021-02-01", "2021-04-30"]
-fetchcube = fetch_SENTINEL(bounding, dates)
+bounding = {"west": 5.05, "south": 51.21, "east": 5.06, "north": 51.22}
+dates = ["2022-07-01", "2022-07-30"]
 
 # A function to calculate NDVI, based on the cube
 
-def ndvi_generation(datacube, output_path):
-    """ Generates an NDVI composite image from a given datacube and saves it as a GeoTIFF.
-
-    Parameters:
-    datacube (openeo.ImageCollection): The datacube obtained from Sentinel-2 data.
-    output_path (str): The file path where the NDVI GeoTIFF will be saved.
-    """
-    # Rescale digital number values to physical reflectances
-    red = datacube.band("B04") * 0.0001
-    nir = datacube.band("B08") * 0.0001
+# def ndvi_generation(datacube, output_path):
+#    """ Generates an NDVI composite image from a given datacube and saves it as a GeoTIFF.
+#
+#    Parameters:
+#    datacube (openeo.ImageCollection): The datacube obtained from Sentinel-2 data.
+#    output_path (str): The file path where the NDVI GeoTIFF will be saved.
+#    """
+#    # Rescale digital number values to physical reflectances
+#    red = datacube.band("B04") * 0.0001
+#    nir = datacube.band("B8A") * 0.0001
 
     # compute ndvi
 
-    ndvi_cube = (nir - red) / (nir + red)
+#    ndvi_cube = (nir - red) / (nir + red)
 
-    # Reduce the temporal dimension by taking the maximum value for each pixel
+    # Reduce the temporal dimension by taking the mean value for each pixel
    
-    ndvi_composite = ndvi_cube.max_time()
+#    ndvi_composite = ndvi_cube.mean_time()
 
     # Download the result as a GeoTIFF file
-    ndvi_composite.download(output_path)
-    print(f"NDVI data saved to {output_path}")
+ #   ndvi_composite.download(output_path)
+#    print(f"NDVI data saved to {output_path}")
 
+def fetch_NDVI_TERRASCOPE(bbox, datetime, output_path):
+    """
+    Fetches and processes NDVI data from the TERRASCOPE_S2_NDVI_V2 collection using the openEO API.
+
+    This function connects to the Copernicus openEO backend, loads NDVI data for the given spatial and temporal
+    extent, rescales the raw values, and computes the temporal maximum composite.
+
+    Parameters:
+    bbox (dict): A dictionary specifying the bounding box with keys 'west', 'south', 'east', 'north'.
+    datetime (list): A list containing the start and end date strings (e.g., ["2022-05-01", "2022-05-30"]).
+
+    Returns:
+    openeo.ImageCollection: A datacube of the maximum NDVI composite over time.
+    """
+    connection = openeo.connect("openeofed.dataspace.copernicus.eu")
+    connection.authenticate_oidc()
+
+    cube = connection.load_collection(
+        "TERRASCOPE_S2_NDVI_V2",
+        spatial_extent=bbox,
+        temporal_extent=datetime,
+        bands=["NDVI_10M"],
+    )
+
+    cube = cube.apply(lambda x: 0.004 * x - 0.08).max_time()
+
+    cube.download(output_path)
+    print(f"NDVI data saved to {output_path}")
 
 def c_factor(tiff_path, output_path):
     """
@@ -149,5 +176,5 @@ ndvi_path = os.path.join(ndvi_dir, "ndvi.tiff")
 c_factor_path = os.path.join(c_factor_dir, "cover_factor.tiff")
 
 # Example usage
-ndvi_generation(fetchcube, ndvi_path)
+fetch_NDVI_TERRASCOPE(bounding, dates, ndvi_path)
 c_factor_and_cleanup(ndvi_path, c_factor_path)

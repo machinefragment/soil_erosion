@@ -6,7 +6,7 @@ import numpy as np
 
 
 # Define the file path
-raster_path = r"C:\soil_erosion\tutorial_data\PRISM_ppt_30yr_normal_800mM4_annual_bil\PRISM_ppt_30yr_normal_800mM4_annual_bil.bil"
+raster_path = r"C:\Users\jpkeb\Documents\soil_erosion\tutorial_data\PRISM_ppt_30yr_normal_800mM4_annual_bil\PRISM_ppt_30yr_normal_800mM4_annual_bil.bil"
 
 def clip_raster_within_conus(filepath, minx, miny, maxx, maxy):
     """
@@ -56,8 +56,8 @@ def clip_raster_within_conus(filepath, minx, miny, maxx, maxy):
         return clipped_data, clipped_transform, clipped_meta
 
 # Define a bounding box in EPSG:4326 (lat/lon) — e.g. around Kansas - sample use
-minx, miny = -98.0, 37.0
-maxx, maxy = -97.0, 38.0
+minx, miny = -77.5, 40.9
+maxx, maxy = -76.5, 41.9
 
 result = clip_raster_within_conus(raster_path, minx, miny, maxx, maxy)
 
